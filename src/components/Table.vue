@@ -13,7 +13,7 @@
         <tr class="entry-row" v-for="item in list" :key="item.id">
           <td ref="personColRef" class="person-col">{{ item.name }}</td>
           <td v-for="(day, idx) in item.days" :key="idx" class="day-col">
-            <div class="h-100">
+            <div class="h-100 position-relative">
               <div
                 v-if="
                   item.id === hoveredCells.rowId &&
@@ -30,13 +30,13 @@
                   day != 0 &&
                   !(
                     hoveredCells.rowId == item.id &&
-                    hoveredCells.cellIndexes.includes(idx) &&
-                    hoveredCells.direction == 'right'
+                    hoveredCells.cellIndexes.includes(idx)
                   )
                 "
               >
+                <!-- hoveredCells.direction == 'right' -->
                 <div
-                  v-if="item.days[idx - 1] == 0"
+                  v-if="item.days[idx - 1] == 0 || item.days[idx - 1] == null"
                   :class="!hoveredCells.active ? 'day-left-handle' : ''"
                   @mousedown="
                     mouseDownLeftHandle($event, {
@@ -78,7 +78,7 @@ export default {
           id: 1,
           name: "Dmitry Fedorov",
           days: [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0,
           ],
         },
@@ -104,13 +104,13 @@ export default {
   },
   mounted() {
     this.calculateTableDaysWidth();
-    window.addEventListener(
-      "resize",
-      () => {
-        this.calculateTableDaysWidth();
-      },
-      true
-    );
+    // window.addEventListener(
+    //   "resize",
+    //   () => {
+    //     this.calculateTableDaysWidth();
+    //   },
+    //   true
+    // );
   },
   methods: {
     calculateTableDaysWidth() {
@@ -180,6 +180,9 @@ export default {
             this.hoveredCells.direction = "left";
             this.hoveredCells.rowId = this.activeCellObj.itemId;
 
+            if (this.activeCellObj.index - this.timesMovedLeftByOneCell < 0) {
+              return;
+            }
             this.hoveredCells.cellIndexes.unshift(
               this.activeCellObj.index - this.timesMovedLeftByOneCell
             );
@@ -201,7 +204,7 @@ export default {
         if (this.initialDirection === "right") {
           if (this.mouseLastPosX !== -1) {
             mouseCheckpointPosX =
-              mouseXPosition < this.mouseStartPosX + this.cellWidth
+              mouseXPosition < this.mouseStartPosX - this.cellWidth
                 ? this.mouseStartPosX
                 : this.mouseLastPosX;
           } else {
@@ -214,16 +217,26 @@ export default {
             mouseXPosition >= mouseCheckpointPosX + this.cellWidth;
 
           if (movedLeftByOneCell) {
-            // TODO
+            this.mouseLastPosX = e.clientX;
+
+            this.hoveredCells.active = true;
+            this.hoveredCells.direction = "left";
+            this.hoveredCells.rowId = this.activeCellObj.itemId;
+
+            if (this.hoveredCells.cellIndexes.length > 0) {
+              this.hoveredCells.cellIndexes.pop();
+            }
           }
           if (movedRightByOneCell) {
             this.mouseLastPosX = e.clientX;
+            if (this.hoveredCells.direction === "left") {
+              this.timesMovedRightByOneCell = 0;
+            }
 
             this.hoveredCells.active = true;
             this.hoveredCells.direction = "right";
             this.hoveredCells.rowId = this.activeCellObj.itemId;
 
-            console.log("this.active cell obj", this.activeCellObj);
             let activeItemIndex = this.list.findIndex(
               (item) => item.id === this.activeCellObj.itemId
             );
@@ -266,13 +279,18 @@ export default {
         });
       }
 
-      if (this.initialDirection === 'right') {
-        this.hoveredCells.cellIndexes.forEach(index => {
+      if (this.initialDirection === "right") {
+        this.hoveredCells.cellIndexes.forEach((index) => {
           this.list[activeItemIndex].days[index] = 0;
-        })
+        });
       }
 
-      this.list[activeItemIndex];
+      this.resetDragState();
+    },
+    changeMouseCursor(cursorType) {
+      document.body.style.cursor = cursorType;
+    },
+    resetDragState() {
       this.cellWidth = 0;
       this.cellHeight = 0;
       this.activeCellObj = null;
@@ -282,9 +300,6 @@ export default {
       this.mouseLastPosX = -1;
       this.mouseStartPosX = -1;
       this.initialDirection = null;
-    },
-    changeMouseCursor(cursorType) {
-      document.body.style.cursor = cursorType;
     },
   },
 };
@@ -352,6 +367,10 @@ tr:nth-child(even) {
 .hovered-cell {
   background-color: rgba(24, 79, 233, 0.5);
   height: 100%;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 </style>
