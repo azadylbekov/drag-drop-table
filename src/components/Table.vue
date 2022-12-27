@@ -9,7 +9,7 @@
           </th>
         </tr>
       </thead>
-      <tbody>
+      <tbody ref="tableBodyRef">
         <tr class="entry-row" v-for="item in list" :key="item.id">
           <td ref="personColRef" class="person-col">{{ item.name }}</td>
           <td v-for="(day, idx) in item.days" :key="idx" class="day-col">
@@ -37,11 +37,10 @@
                   )
                 "
               >
-                <!-- hoveredCells.direction == 'right' -->
                 <div
                   v-if="item.days[idx - 1] == 0 || item.days[idx - 1] == null"
                   :class="!hoveredCells.active ? 'day-left-handle' : ''"
-                  @mousedown="
+                  @mousedown.stop="
                     mouseDownLeftHandle($event, {
                       itemId: item.id,
                       day: day,
@@ -85,6 +84,22 @@ export default {
             0, 0, 0, 0, 0, 0, 0,
           ],
         },
+        {
+          id: 2,
+          name: "Dmitry Stoyanov",
+          days: [
+            0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+          ],
+        },
+        {
+          id: 3,
+          name: "Renaud Viot",
+          days: [
+            1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+          ],
+        },
       ],
       hoveredCells: {
         rowId: -1,
@@ -96,6 +111,8 @@ export default {
       cellHeight: 0,
       mouseStartPosX: -1,
       mouseLastPosX: -1,
+      mouseStartPosY: -1,
+      mouseLastPosY: -1,
       activeCellObj: { itemId: -1, day: -1, index: -1 },
       timesMovedLeftByOneCell: 0,
       timesMovedRightByOneCell: 0,
@@ -105,9 +122,21 @@ export default {
       isInitDirectionSet: false,
       isMoving: false,
       isDragging: false,
+      newRowId: -1,
+      clickCellCoord: {
+        topY: -1,
+        bottomY: -1,
+        leftX: -1,
+        rightX: -1,
+      },
+      tableBodyCoord: {
+        topY: -1,
+        bottomY: -1,
+      },
     };
   },
   mounted() {
+    this.initTableBodyCoord();
     this.calculateTableDaysWidth();
     // window.addEventListener(
     //   "resize",
@@ -118,6 +147,12 @@ export default {
     // );
   },
   methods: {
+    initTableBodyCoord() {
+      let tableBodyCoordTemp = this.$refs.tableBodyRef.getBoundingClientRect();
+      this.tableBodyCoord.topY = tableBodyCoordTemp.top;
+      this.tableBodyCoord.bottomY = tableBodyCoordTemp.bottom;
+      console.log("tableBodyCoord", tableBodyCoordTemp);
+    },
     calculateTableDaysWidth() {
       let tableWidth = this.$refs.tableRef.offsetWidth;
       let personColWidth = this.$refs.personColRef[0].offsetWidth;
@@ -138,11 +173,14 @@ export default {
     },
     trackMouse(e) {
       e.preventDefault();
-      // console.log("tracking mouse");
       let mouseXPosition = e.clientX;
+      let mouseYPosition = e.clientY;
       let movedLeftByOneCell;
       let movedRightByOneCell;
+      let movedTopByOneCell;
+      let movedDownByOneCell;
       let mouseCheckpointPosX;
+      let mouseCheckpointPosY;
 
       if (this.isDragging && this.cellWidth) {
         if (!this.initialDirection) {
@@ -269,13 +307,63 @@ export default {
           mouseCheckpointPosX = this.mouseLastPosX;
         }
 
+        if (this.mouseLastPosY === -1) {
+          mouseCheckpointPosY = this.mouseStartPosY;
+        } else {
+          mouseCheckpointPosY = this.mouseLastPosY;
+        }
+
         movedLeftByOneCell =
           mouseXPosition < mouseCheckpointPosX - this.cellWidth &&
           mouseXPosition > mouseCheckpointPosX - this.cellWidth * 2;
-        console.log("moved left by one cell", movedLeftByOneCell);
+        movedRightByOneCell =
+          mouseXPosition > mouseCheckpointPosX + this.cellWidth;
+
+        movedTopByOneCell = mouseYPosition < this.clickCellCoord.topY;
+        movedDownByOneCell = mouseYPosition > this.clickCellCoord.bottomY;
 
         if (movedLeftByOneCell) {
           this.mouseLastPosX = mouseXPosition;
+
+          this.hoveredCells.cellIndexes = this.hoveredCells.cellIndexes.map(
+            (cell) => cell - 1
+          );
+
+          this.newRowId = this.hoveredCells.rowId;
+        }
+
+        if (movedRightByOneCell) {
+          this.mouseLastPosX = mouseXPosition;
+
+          this.hoveredCells.cellIndexes = this.hoveredCells.cellIndexes.map(
+            (cell) => cell + 1
+          );
+
+          this.newRowId = this.hoveredCells.rowId;
+        }
+
+        if (movedTopByOneCell) {
+          console.log("moved top");
+          this.mouseLastPosY = mouseYPosition;
+          // this.mouseStartPosX = e.client
+          this.clickCellCoord.topY = this.clickCellCoord.topY - this.cellHeight;
+          this.clickCellCoord.bottomY =
+            this.clickCellCoord.bottomY - this.cellHeight;
+
+          this.hoveredCells.rowId =
+            this.hoveredCells.rowId - 1 < 0 ? 0 : this.hoveredCells.rowId - 1;
+          this.newRowId = this.hoveredCells.rowId;
+        }
+
+        if (movedDownByOneCell) {
+          console.log("moved bottom");
+          this.mouseLastPosY = mouseYPosition;
+          this.clickCellCoord.bottomY =
+            this.clickCellCoord.bottomY + this.cellHeight;
+          this.clickCellCoord.topY = this.clickCellCoord.topY + this.cellHeight;
+
+          this.hoveredCells.rowId = this.hoveredCells.rowId + 1;
+          this.newRowId = this.hoveredCells.rowId;
         }
       }
     },
@@ -290,33 +378,46 @@ export default {
     },
     filledCellMouseDown(e, cellObj) {
       e.preventDefault();
+      console.log(
+        "e.target.getBounding client rect",
+        e.target.getBoundingClientRect()
+      );
+      let targetCoord = e.target.getBoundingClientRect();
+
       this.changeMouseCursor("grabbing");
       this.cellWidth = e.target.parentElement.offsetWidth;
       this.cellHeight = e.target.parentElement.offsetHeight;
       this.mouseStartPosX = e.clientX;
+      this.mouseStartPosY = e.clientY;
       this.activeCellObj = cellObj;
       this.isMoving = true;
+      this.clickCellCoord = {
+        topY: targetCoord.top,
+        bottomY: targetCoord.bottom,
+        leftX: targetCoord.x,
+        rightX: targetCoord.right,
+      };
 
       this.timesMovedLeftByOneCell++;
 
       this.hoveredCells.active = true;
-      // this.hoveredCells.direction = "left";
       this.hoveredCells.rowId = this.activeCellObj.itemId;
 
       let listItem = this.list.find(
         (item) => item.id == this.activeCellObj.itemId
       );
 
-      // console.log('list item', listItem.days);
       let cellIndexesToFill = [];
 
       let i = this.activeCellObj.index;
 
-      while (listItem.days[i] != 0 && i >= 0) {
-        if (!cellIndexesToFill.includes(i)) {
-          cellIndexesToFill.push(i);
+      if (i > 0) {
+        while (listItem.days[i] != 0 && i >= 0) {
+          if (!cellIndexesToFill.includes(i)) {
+            cellIndexesToFill.push(i);
+          }
+          i--;
         }
-        i--;
       }
 
       i = this.activeCellObj.index;
@@ -330,9 +431,7 @@ export default {
 
       cellIndexesToFill.sort();
 
-      console.log("cell indexes to fill", cellIndexesToFill);
-
-      // this.hoveredCells.cellIndexes = [this.activeCellObj.index];
+      this.hoveredCells.cellIndexes = cellIndexesToFill;
     },
     mouseUpHandle() {
       this.changeMouseCursor("auto");
@@ -343,22 +442,65 @@ export default {
         (item) => item.id === this.activeCellObj.itemId
       );
 
-      if (this.initialDirection === "left") {
-        this.hoveredCells.cellIndexes.forEach((index) => {
-          this.list[activeItemIndex].days[index] = 1;
-        });
+      if (this.isDragging) {
+        if (this.initialDirection === "left") {
+          this.hoveredCells.cellIndexes.forEach((index) => {
+            this.list[activeItemIndex].days[index] = 1;
+          });
+        }
+
+        if (this.initialDirection === "right") {
+          this.hoveredCells.cellIndexes.forEach((index) => {
+            this.list[activeItemIndex].days[index] = 0;
+          });
+        }
       }
 
-      if (this.initialDirection === "right") {
-        this.hoveredCells.cellIndexes.forEach((index) => {
-          this.list[activeItemIndex].days[index] = 0;
-        });
+      if (this.isMoving) {
+        let newActiveItemIndex = this.list.findIndex(
+          (item) => item.id === this.newRowId
+        );
+
+        let listItem = this.list.find(
+          (item) => item.id == this.activeCellObj.itemId
+        );
+
+        let cellIndexesToFill = [];
+
+        let i = this.activeCellObj.index;
+
+        if (i > 0) {
+          while (listItem.days[i] != 0 && i >= 0) {
+            if (!cellIndexesToFill.includes(i)) {
+              cellIndexesToFill.push(i);
+            }
+            i--;
+          }
+        }
+
+        i = this.activeCellObj.index;
+
+        while (listItem.days[i] != 0) {
+          if (!cellIndexesToFill.includes(i)) {
+            cellIndexesToFill.push(i);
+          }
+          i++;
+        }
+
+        cellIndexesToFill.sort();
+
+        if (newActiveItemIndex >= 0) {
+          cellIndexesToFill.forEach((index) => {
+            this.list[activeItemIndex].days[index] = 0;
+          });
+
+          this.hoveredCells.cellIndexes.forEach((index) => {
+            this.list[newActiveItemIndex].days[index] = 1;
+          });
+        }
       }
 
       this.resetDragState();
-    },
-    changeMouseCursor(cursorType) {
-      document.body.style.cursor = cursorType;
     },
     resetDragState() {
       this.cellWidth = 0;
@@ -372,6 +514,10 @@ export default {
       this.initialDirection = null;
       this.isMoving = false;
       this.isDragging = false;
+      this.newRowId = -1;
+    },
+    changeMouseCursor(cursorType) {
+      document.body.style.cursor = cursorType;
     },
   },
 };
