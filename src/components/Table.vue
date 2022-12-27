@@ -24,6 +24,9 @@
                 <div :class="hoveredCellHandleClass(idx)"></div>
               </div>
               <div
+                @mousedown="
+                  filledCellMouseDown($event, { itemId: item.id, index: idx })
+                "
                 class="day-marker h-100"
                 :class="day != 0 ? 'day-filled' : ''"
                 v-if="
@@ -100,6 +103,8 @@ export default {
       initialDirection: "",
       tableDaysWidth: 0,
       isInitDirectionSet: false,
+      isMoving: false,
+      isDragging: false,
     };
   },
   mounted() {
@@ -134,12 +139,12 @@ export default {
     trackMouse(e) {
       e.preventDefault();
       // console.log("tracking mouse");
-      if (this.cellWidth) {
-        let mouseXPosition = e.clientX;
-        let movedLeftByOneCell;
-        let movedRightByOneCell;
-        let mouseCheckpointPosX;
+      let mouseXPosition = e.clientX;
+      let movedLeftByOneCell;
+      let movedRightByOneCell;
+      let mouseCheckpointPosX;
 
+      if (this.isDragging && this.cellWidth) {
         if (!this.initialDirection) {
           movedLeftByOneCell =
             mouseXPosition <= this.mouseStartPosX - this.cellWidth;
@@ -165,7 +170,8 @@ export default {
             mouseCheckpointPosX = this.mouseStartPosX;
           }
           movedLeftByOneCell =
-            mouseXPosition <= mouseCheckpointPosX - this.cellWidth;
+            mouseXPosition <= mouseCheckpointPosX - this.cellWidth &&
+            mouseXPosition > mouseCheckpointPosX - this.cellWidth * 2;
           movedRightByOneCell =
             mouseXPosition >= mouseCheckpointPosX + this.cellWidth;
 
@@ -214,7 +220,8 @@ export default {
           movedLeftByOneCell =
             mouseXPosition <= mouseCheckpointPosX - this.cellWidth;
           movedRightByOneCell =
-            mouseXPosition >= mouseCheckpointPosX + this.cellWidth;
+            mouseXPosition >= mouseCheckpointPosX + this.cellWidth &&
+            mouseXPosition < mouseCheckpointPosX + this.cellWidth * 2;
 
           if (movedLeftByOneCell) {
             this.mouseLastPosX = e.clientX;
@@ -255,6 +262,22 @@ export default {
           }
         }
       }
+      if (this.isMoving && this.cellWidth) {
+        if (this.mouseLastPosX === -1) {
+          mouseCheckpointPosX = this.mouseStartPosX;
+        } else {
+          mouseCheckpointPosX = this.mouseLastPosX;
+        }
+
+        movedLeftByOneCell =
+          mouseXPosition < mouseCheckpointPosX - this.cellWidth &&
+          mouseXPosition > mouseCheckpointPosX - this.cellWidth * 2;
+        console.log("moved left by one cell", movedLeftByOneCell);
+
+        if (movedLeftByOneCell) {
+          this.mouseLastPosX = mouseXPosition;
+        }
+      }
     },
     mouseDownLeftHandle(e, cellObj) {
       e.preventDefault();
@@ -263,6 +286,53 @@ export default {
       this.cellHeight = e.target.parentElement.offsetHeight;
       this.mouseStartPosX = e.clientX;
       this.activeCellObj = cellObj;
+      this.isDragging = true;
+    },
+    filledCellMouseDown(e, cellObj) {
+      e.preventDefault();
+      this.changeMouseCursor("grabbing");
+      this.cellWidth = e.target.parentElement.offsetWidth;
+      this.cellHeight = e.target.parentElement.offsetHeight;
+      this.mouseStartPosX = e.clientX;
+      this.activeCellObj = cellObj;
+      this.isMoving = true;
+
+      this.timesMovedLeftByOneCell++;
+
+      this.hoveredCells.active = true;
+      // this.hoveredCells.direction = "left";
+      this.hoveredCells.rowId = this.activeCellObj.itemId;
+
+      let listItem = this.list.find(
+        (item) => item.id == this.activeCellObj.itemId
+      );
+
+      // console.log('list item', listItem.days);
+      let cellIndexesToFill = [];
+
+      let i = this.activeCellObj.index;
+
+      while (listItem.days[i] != 0 && i >= 0) {
+        if (!cellIndexesToFill.includes(i)) {
+          cellIndexesToFill.push(i);
+        }
+        i--;
+      }
+
+      i = this.activeCellObj.index;
+
+      while (listItem.days[i] != 0) {
+        if (!cellIndexesToFill.includes(i)) {
+          cellIndexesToFill.push(i);
+        }
+        i++;
+      }
+
+      cellIndexesToFill.sort();
+
+      console.log("cell indexes to fill", cellIndexesToFill);
+
+      // this.hoveredCells.cellIndexes = [this.activeCellObj.index];
     },
     mouseUpHandle() {
       this.changeMouseCursor("auto");
@@ -300,6 +370,8 @@ export default {
       this.mouseLastPosX = -1;
       this.mouseStartPosX = -1;
       this.initialDirection = null;
+      this.isMoving = false;
+      this.isDragging = false;
     },
   },
 };
