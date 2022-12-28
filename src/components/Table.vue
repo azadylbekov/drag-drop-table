@@ -3,7 +3,7 @@
     <table ref="tableRef">
       <thead>
         <tr>
-          <th class="person-col">Person</th>
+          <th ref="tablePersonRef" class="person-col">Person</th>
           <th v-for="day in 30" :key="day" class="day-col">
             {{ day }}
           </th>
@@ -129,9 +129,11 @@ export default {
         leftX: -1,
         rightX: -1,
       },
-      tableBodyCoord: {
+      entryBodyCoord: {
         topY: -1,
         bottomY: -1,
+        leftX: -1,
+        rightX: -1,
       },
     };
   },
@@ -149,9 +151,18 @@ export default {
   methods: {
     initTableBodyCoord() {
       let tableBodyCoordTemp = this.$refs.tableBodyRef.getBoundingClientRect();
-      this.tableBodyCoord.topY = tableBodyCoordTemp.top;
-      this.tableBodyCoord.bottomY = tableBodyCoordTemp.bottom;
+      let tablePersonCoordTemp =
+        this.$refs.tablePersonRef.getBoundingClientRect();
+      this.entryBodyCoord.topY = tablePersonCoordTemp.bottom;
+      this.entryBodyCoord.bottomY = tableBodyCoordTemp.bottom;
+      this.entryBodyCoord.leftX = Math.floor(
+        tableBodyCoordTemp.x + tablePersonCoordTemp.width
+      );
+      this.entryBodyCoord.rightX = tableBodyCoordTemp.right;
       console.log("tableBodyCoord", tableBodyCoordTemp);
+      console.log("tablePersonCoordTemp", tablePersonCoordTemp);
+      console.log("tableRef", this.$refs.tableRef.getBoundingClientRect());
+
     },
     calculateTableDaysWidth() {
       let tableWidth = this.$refs.tableRef.offsetWidth;
@@ -185,9 +196,11 @@ export default {
       if (this.isDragging && this.cellWidth) {
         if (!this.initialDirection) {
           movedLeftByOneCell =
-            mouseXPosition <= this.mouseStartPosX - this.cellWidth;
+            mouseXPosition < this.clickCellCoord.leftX - this.cellWidth;
           movedRightByOneCell =
-            mouseXPosition >= this.mouseStartPosX + this.cellWidth;
+            mouseXPosition > this.clickCellCoord.rightX + this.cellWidth;
+          // movedRightByOneCell =
+          //   mouseXPosition >= this.mouseStartPosX + this.cellWidth;
         }
 
         if (movedLeftByOneCell) {
@@ -199,22 +212,17 @@ export default {
         }
 
         if (this.initialDirection === "left") {
-          if (this.mouseLastPosX !== -1) {
-            mouseCheckpointPosX =
-              mouseXPosition > this.mouseStartPosX - this.cellWidth
-                ? this.mouseStartPosX
-                : this.mouseLastPosX;
-          } else {
-            mouseCheckpointPosX = this.mouseStartPosX;
-          }
           movedLeftByOneCell =
-            mouseXPosition <= mouseCheckpointPosX - this.cellWidth &&
-            mouseXPosition > mouseCheckpointPosX - this.cellWidth * 2;
+            mouseXPosition < this.clickCellCoord.leftX - this.cellWidth &&
+            mouseXPosition > this.entryBodyCoord.leftX;
           movedRightByOneCell =
-            mouseXPosition >= mouseCheckpointPosX + this.cellWidth;
+            mouseXPosition > this.clickCellCoord.rightX + this.cellWidth &&
+            mouseXPosition < this.mouseStartPosX + this.cellWidth;
 
           if (movedLeftByOneCell) {
-            this.mouseLastPosX = e.clientX;
+            this.clickCellCoord.leftX -= this.cellWidth;
+            this.clickCellCoord.rightX -= this.cellWidth;
+
             if (this.hoveredCells.direction === "right") {
               this.timesMovedLeftByOneCell = 0;
             }
@@ -233,7 +241,8 @@ export default {
           }
 
           if (movedRightByOneCell) {
-            this.mouseLastPosX = e.clientX;
+            this.clickCellCoord.rightX += this.cellWidth;
+            this.clickCellCoord.leftX += this.cellWidth;
 
             this.hoveredCells.active = true;
             this.hoveredCells.direction = "right";
@@ -246,23 +255,17 @@ export default {
         }
 
         if (this.initialDirection === "right") {
-          if (this.mouseLastPosX !== -1) {
-            mouseCheckpointPosX =
-              mouseXPosition < this.mouseStartPosX - this.cellWidth
-                ? this.mouseStartPosX
-                : this.mouseLastPosX;
-          } else {
-            mouseCheckpointPosX = this.mouseStartPosX;
-          }
 
-          movedLeftByOneCell =
-            mouseXPosition <= mouseCheckpointPosX - this.cellWidth;
           movedRightByOneCell =
-            mouseXPosition >= mouseCheckpointPosX + this.cellWidth &&
-            mouseXPosition < mouseCheckpointPosX + this.cellWidth * 2;
+            mouseXPosition > this.clickCellCoord.rightX + this.cellWidth;
+          movedLeftByOneCell =
+            mouseXPosition < this.clickCellCoord.leftX - this.cellWidth &&
+            mouseXPosition > this.mouseStartPosX - this.cellWidth;
 
           if (movedLeftByOneCell) {
-            this.mouseLastPosX = e.clientX;
+
+            this.clickCellCoord.leftX -= this.cellWidth;
+            this.clickCellCoord.rightX -= this.cellWidth;
 
             this.hoveredCells.active = true;
             this.hoveredCells.direction = "left";
@@ -273,7 +276,7 @@ export default {
             }
           }
           if (movedRightByOneCell) {
-            this.mouseLastPosX = e.clientX;
+
             if (this.hoveredCells.direction === "left") {
               this.timesMovedRightByOneCell = 0;
             }
@@ -293,6 +296,9 @@ export default {
             if (isLastActiveCell) {
               return;
             }
+            this.clickCellCoord.rightX += this.cellWidth;
+            this.clickCellCoord.leftX += this.cellWidth;
+
             this.hoveredCells.cellIndexes.push(
               this.activeCellObj.index + this.timesMovedRightByOneCell
             );
@@ -307,20 +313,14 @@ export default {
           mouseCheckpointPosX = this.mouseLastPosX;
         }
 
-        if (this.mouseLastPosY === -1) {
-          mouseCheckpointPosY = this.mouseStartPosY;
-        } else {
-          mouseCheckpointPosY = this.mouseLastPosY;
-        }
-
         movedLeftByOneCell =
           mouseXPosition < mouseCheckpointPosX - this.cellWidth &&
           mouseXPosition > mouseCheckpointPosX - this.cellWidth * 2;
         movedRightByOneCell =
           mouseXPosition > mouseCheckpointPosX + this.cellWidth;
 
-        movedTopByOneCell = mouseYPosition < this.clickCellCoord.topY;
-        movedDownByOneCell = mouseYPosition > this.clickCellCoord.bottomY;
+        movedTopByOneCell = mouseYPosition < this.clickCellCoord.topY && mouseYPosition > this.entryBodyCoord.topY + this.cellHeight;
+        movedDownByOneCell = mouseYPosition > this.clickCellCoord.bottomY && mouseYPosition < this.entryBodyCoord.bottomY;
 
         if (movedLeftByOneCell) {
           this.mouseLastPosX = mouseXPosition;
@@ -346,9 +346,8 @@ export default {
           console.log("moved top");
           this.mouseLastPosY = mouseYPosition;
           // this.mouseStartPosX = e.client
-          this.clickCellCoord.topY = this.clickCellCoord.topY - this.cellHeight;
-          this.clickCellCoord.bottomY =
-            this.clickCellCoord.bottomY - this.cellHeight;
+          this.clickCellCoord.topY -= this.cellHeight;
+          this.clickCellCoord.bottomY -= this.cellHeight;
 
           this.hoveredCells.rowId =
             this.hoveredCells.rowId - 1 < 0 ? 0 : this.hoveredCells.rowId - 1;
@@ -358,9 +357,8 @@ export default {
         if (movedDownByOneCell) {
           console.log("moved bottom");
           this.mouseLastPosY = mouseYPosition;
-          this.clickCellCoord.bottomY =
-            this.clickCellCoord.bottomY + this.cellHeight;
-          this.clickCellCoord.topY = this.clickCellCoord.topY + this.cellHeight;
+          this.clickCellCoord.bottomY += this.cellHeight;
+          this.clickCellCoord.topY += this.cellHeight;
 
           this.hoveredCells.rowId = this.hoveredCells.rowId + 1;
           this.newRowId = this.hoveredCells.rowId;
@@ -369,19 +367,25 @@ export default {
     },
     mouseDownLeftHandle(e, cellObj) {
       e.preventDefault();
+      let targetCoord = e.target.getBoundingClientRect();
+
       this.changeMouseCursor("ew-resize");
       this.cellWidth = e.target.parentElement.offsetWidth;
       this.cellHeight = e.target.parentElement.offsetHeight;
       this.mouseStartPosX = e.clientX;
       this.activeCellObj = cellObj;
       this.isDragging = true;
+
+      this.clickCellCoord = {
+        topY: targetCoord.top,
+        bottomY: targetCoord.bottom,
+        leftX: targetCoord.x,
+        rightX: targetCoord.right,
+      };
     },
     filledCellMouseDown(e, cellObj) {
       e.preventDefault();
-      console.log(
-        "e.target.getBounding client rect",
-        e.target.getBoundingClientRect()
-      );
+
       let targetCoord = e.target.getBoundingClientRect();
 
       this.changeMouseCursor("grabbing");
@@ -515,6 +519,7 @@ export default {
       this.isMoving = false;
       this.isDragging = false;
       this.newRowId = -1;
+      this.clickCellCoord = {};
     },
     changeMouseCursor(cursorType) {
       document.body.style.cursor = cursorType;
