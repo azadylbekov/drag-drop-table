@@ -187,6 +187,8 @@ export default {
       let movedDownByOneCell;
 
       // console.log('mouse x position', mouseXPosition);
+      // console.log('mouse y position', mouseYPosition);
+      
 
       if (this.isDragging && this.cellWidth) {
         if (!this.initialDirection) {
@@ -336,10 +338,10 @@ export default {
 
         movedTopByOneCell =
           mouseYPosition < this.clickCellCoord.topY &&
-          mouseYPosition > this.entryBodyCoord.topY + this.cellHeight;
+          mouseYPosition > this.entryBodyCoord.topY + this.cellHeight / 2;
         movedDownByOneCell =
           mouseYPosition > this.clickCellCoord.bottomY &&
-          mouseYPosition < this.entryBodyCoord.bottomY - this.cellHeight;
+          mouseYPosition < this.entryBodyCoord.bottomY - this.cellHeight / 2;        
 
         this.newRowId = this.hoveredCells.rowId;
 
